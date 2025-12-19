@@ -1,5 +1,5 @@
 <template>
-  <ion-menu side="end" content-id="main-content">
+  <ion-menu side="end" content-id="series-content">
     <ion-header>
       <ion-toolbar>
         <ion-title>Cuenta</ion-title>
@@ -15,8 +15,8 @@
     </ion-content>
   </ion-menu>
 
-  <ion-page id="main-content">
-    <ion-header :translucent="true">
+  <ion-page id="series-content">
+    <ion-header>
       <ion-toolbar>
         <ion-title>MiFilmTracker</ion-title>
 
@@ -41,23 +41,23 @@
         </ion-toolbar>
       </ion-header>
 
-      <h1>Películas</h1>
+      <h1>Series</h1>
       <ion-list>
-        <ion-item v-for="film in films" :key="film.id">
+        <ion-item v-for="serie in series" :key="serie.id">
           <ion-label>
-            <h2>{{ film.title }}</h2>
-            <p>{{ film.year }}</p>
+            <h2>{{ serie.title }}</h2>
+            <p>{{ serie.year }} — {{ serie.seasons }} Temp / {{ serie.episodes }} Eps</p>
           </ion-label>
 
-          <template v-if="film.owner === auth.user?.id">
+          <template v-if="serie.owner === auth.user?.id">
             <ion-button id="button"
-              fill="clear"
-              @click="openEditModal(film)">Editar</ion-button>
-
+              fill="clear" 
+              @click="openEditModal(serie)">Editar</ion-button>
+            
             <ion-button id="button"
-              fill="clear"
-              color="danger"
-              @click="deleteFilm(film.id)">Eliminar</ion-button>
+              fill="clear" 
+              color="danger" 
+              @click="deleteSeries(serie.id)">Eliminar</ion-button>
           </template>
         </ion-item>
       </ion-list>
@@ -72,7 +72,7 @@
         <ion-header>
           <ion-toolbar>
             <ion-title>
-              {{ editingFilm ? 'Editar película' : 'Nueva película' }}
+              {{ editingSeries ? 'Editar serie' : 'Nueva serie' }}
             </ion-title>
             <ion-buttons slot="end">
               <ion-button @click="showModal = false">Cerrar</ion-button>
@@ -82,26 +82,28 @@
 
         <ion-content class="ion-padding">
           <ion-input label="Título" v-model="form.title" required :minlength="1" :maxlength="50"></ion-input>
-          <ion-input label="Año" type="number" v-model.number="form.year" required min="1888"></ion-input>
+          <ion-input label="Año" type="number" v-model.number="form.year" required></ion-input>
+          <ion-input label="Temporadas" type="number" v-model.number="form.seasons" required></ion-input>
+          <ion-input label="Episodios" type="number" v-model.number="form.episodes" required></ion-input>
           <ion-input label="Género" v-model="form.genre"></ion-input>
           <ion-input label="Director" v-model="form.director"></ion-input>
           <ion-textarea label="Sinopsis" v-model="form.synopsis"></ion-textarea>
           <input type="file" accept="image/*" @change="onPosterChange"></input>
 
-          <ion-button expand="block" @click="saveFilm" :disabled="saving">
+          <ion-button expand="block" @click="saveSeries" :disabled="saving">
             <ion-spinner v-if="saving" name="crescent"></ion-spinner>
             <span v-else>Guardar</span>
           </ion-button>
         </ion-content>
       </ion-modal>
-
+      
       <ion-toast
         :is-open="showToastFlag"
         :message="toastMessage"
         duration="2000"
         @didDismiss="showToastFlag = false"
       ></ion-toast>
-
+      
     </ion-content>
     <ion-footer>
       <ion-toolbar id="footer">
@@ -112,137 +114,144 @@
 </template>
 
 <script setup lang="ts">
-  import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonButtons, IonItem, IonAvatar, 
-    IonMenu, menuController, IonList, IonFooter, IonLabel, IonFab, IonFabButton, IonIcon, IonModal, IonInput, IonTextarea, 
-    IonToast, IonSpinner } from '@ionic/vue';
-  import { add } from 'ionicons/icons';
-  import { onMounted, ref } from 'vue';
-  import { useAuthStore } from '@/stores/auth';
-  import { useRouter } from 'vue-router';
-  import { useFilmStore } from '@/stores/films';
-  import { storeToRefs } from 'pinia'
-  import type { Film, FilmPayload } from '@/backend/services/film.types'
+import { ref, onMounted } from 'vue';
+import { 
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonFooter, IonItem, IonLabel, 
+  IonButton, IonButtons, IonAvatar, IonMenu, menuController, IonFab, IonFabButton, IonIcon, 
+  IonModal, IonInput, IonTextarea, IonToast } from '@ionic/vue';
+import { add } from 'ionicons/icons';
+import { useAuthStore } from '@/stores/auth';
+import { useSeriesStore } from '@/stores/series';
+import { storeToRefs } from 'pinia';
+import { useRouter } from 'vue-router';
+import type { Series, SeriesPayload } from '@/backend/services/series.types';
 
-  const auth = useAuthStore();
-  const filmStore = useFilmStore();
-  const router = useRouter();
+const auth = useAuthStore();
+const seriesStore = useSeriesStore()
+const router = useRouter();
 
-  const { films } = storeToRefs(filmStore)
+const { series } = storeToRefs(seriesStore);
 
-  const showModal = ref(false)
-  const editingFilm = ref<Film | null>(null)
+const showModal = ref(false);
+const editingSeries = ref<Series | null>(null);
 
-  const form = ref<FilmPayload>({
-    title: '',
-    year: 2025,
-    genre: '',
-    director: '',
-    synopsis: '',
-    poster: null
-  })
+const form = ref<SeriesPayload>({
+  title: '', 
+  year: 2025, 
+  seasons: 1, 
+  episodes: 1, 
+  genre: '', 
+  director: '', 
+  synopsis: '', 
+  poster: null
+});
 
-  const posterFile = ref<File | null>(null)
-  const saving = ref(false)
-  const toastMessage = ref('')
-  const showToastFlag = ref(false)
+const posterFile = ref<File | null>(null);
+const saving = ref(false);
+const toastMessage = ref('')
+const showToastFlag = ref(false)
 
-  onMounted(async () => {
-    await filmStore.listFilm();
-  });
+onMounted(async () => {
+    await seriesStore.listSeries();
+});
 
-  const openMenu = () => {
+const openMenu = () => {
     menuController.open();
-  };
+};
 
-  function onPosterChange(e: Event) {
+function onPosterChange(e: Event) {
     const target = e.target as HTMLInputElement
     if (target.files && target.files.length > 0) {
-      posterFile.value = target.files[0]
+        posterFile.value = target.files[0]
     }
-  }
+}
 
-  async function doLogout() {
+async function doLogout() {
     await menuController.close()
     auth.logout();
     router.replace('/login');
-  }
+}
 
-  async function deleteFilm(id: string) {
+async function deleteSeries(id: string) {
     try {
-      await filmStore.deleteFilm(id)
-      showToast('Película eliminada') 
+      await seriesStore.deleteSeries(id)
+      showToast('Serie eliminada') 
     } catch (err) {
       showToast('Error al eliminar')
     }
   }
 
-  function openEditModal(film: Film) {
-    editingFilm.value = film
+function openEditModal(series: Series) {
+  editingSeries.value = series;
 
-    form.value = {
-      title: film.title,
-      year: film.year,
-      genre: film.genre ?? '',
-      director: film.director ?? '',
-      synopsis: film.synopsis ?? '',
+  form.value = {
+      title: series.title,
+      year: series.year,
+      seasons: series.seasons, 
+      episodes: series.episodes,    
+      genre: series.genre ?? '',
+      director: series.director ?? '',
+      synopsis: series.synopsis ?? '',
       poster: null
     }
 
     posterFile.value = null
     showModal.value = true
+}
+
+function openCreateModal() {
+  editingSeries.value = null;
+
+  form.value = { 
+    title: '', 
+    year: 2025, 
+    seasons: 1, 
+    episodes: 1, 
+    genre: '', 
+    director: '', 
+    synopsis: '', 
+    poster: null 
   }
 
-  function openCreateModal() {
-    editingFilm.value = null
+  posterFile.value = null
+  showModal.value = true;
+}
 
-    form.value = {
-      title: '',
-      year: 2025,
-      genre: '',
-      director: '',
-      synopsis: '',
-      poster: null
-    }
-
-    posterFile.value = null
-    showModal.value = true
-  }
-
-  function showToast(msg: string) {
+function showToast(msg: string) {
     toastMessage.value = msg
     showToastFlag.value = true
+}
+
+async function saveSeries() {
+  if (!form.value.title || !form.value.year) {
+    showToast('Título y año obligatorios')
+    return
   }
 
-  async function saveFilm() {
-    if (!form.value.title || !form.value.year) {
-      showToast('Título y año obligatorios')
-      return
+  saving.value = true;
+  try {
+    const payload: SeriesPayload = { 
+        ...form.value, 
+        poster: posterFile.value 
     }
-    
-    saving.value = true
-    try {
-      const payload: FilmPayload = {
-        ...form.value,
-        poster: posterFile.value
-      }
-      
-      if (editingFilm.value) {
-        await filmStore.editFilm(editingFilm.value.id, payload)
-        showToast('Película editada')
-      } else {
-        await filmStore.createFilm(payload)
-        showToast('Película creada')
-      }
 
-      showModal.value = false
-    } catch (err: any) {
+    if (editingSeries.value) {
+      await seriesStore.editSeries(editingSeries.value.id, payload);
+      showToast('Serie editada')
+    } else {
+      await seriesStore.createSeries(payload);
+      showToast('Serie creada')
+    }
+
+    showModal.value = false;
+  } catch (err: any) {
       console.error("Error al guardar:", err.data);
       showToast(err.message || 'Error al guardar');
-    } finally {
+  } finally {
       saving.value = false
       posterFile.value = null
-    }
   }
+}
 </script>
 
 <style scoped>
